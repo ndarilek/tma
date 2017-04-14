@@ -1,7 +1,9 @@
+extern crate getopts;
 #[macro_use]
 extern crate serde_derive;
 extern crate toml;
 
+use getopts::Options;
 use std::env;
 use std::error::Error;
 use std::fs::File;
@@ -138,7 +140,22 @@ fn create_panes(name: &String, window: &Window, index: usize) {
 }
 
 fn main() {
-    let path = Path::new(".tma.toml");
+    let args: Vec<String> = env::args().collect();
+    let program = args[0].clone();
+    let mut opts = Options::new();
+    opts.optopt("c", "", "specify configuration file (defaults to .tma.toml)", "FILE");
+    opts.optflag("h", "help", "print this help text");
+    let matches = match opts.parse(&args[1..]) {
+        Ok(m) => m,
+        Err(f) => panic!(f.to_string())
+    };
+    if matches.opt_present("h") {
+        let brief = format!("Usage: {} [options]", program);
+        print!("{}", opts.usage(&brief));
+        return;
+    }
+    let path_str = matches.opt_str("c").unwrap_or(".tma.toml".to_string());
+    let path = Path::new(path_str.as_str());
     match load(path) {
         Ok(session) => start(session),
         Err(e) => {
