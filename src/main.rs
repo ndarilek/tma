@@ -142,7 +142,7 @@ fn main() {
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
         Err(f) => {
-            writeln!(io::stderr(), "{}", f.to_string().as_str()).expect("Failed to write to stderr");
+            writeln!(io::stderr(), "{}", f.description()).expect("Failed to write to stderr");
             print_usage(program, opts);
             process::exit(1);
         }
