@@ -90,7 +90,7 @@ fn create_session(session: &Session, name: String) {
         Err(e) => { writeln!(io::stderr(), "Error creating session: {}", e.description()).expect("Failed to write to stderr"); },
         Ok(_) => {
             session.window[0].name.as_ref().map(|n| {
-                tmux(vec!["rename-window", "-t", name.as_str(), n.as_str()]).spawn().unwrap();
+                tmux(vec!["rename-window", "-t", name.as_str(), n.as_str()]).spawn().expect("Failed to rename window");
             });
             create_panes(session, &name, &session.window[0], 0);
             for (i, window) in session.window[1..].iter().enumerate() {
@@ -104,12 +104,12 @@ fn create_session(session: &Session, name: String) {
                     first_pane.root.as_ref().map(|r| window_root.push(r));
                 });
                 cmd.args(vec!["-c", window_root.to_str().expect("Failed to convert root directory name to string")]);
-                cmd.spawn().unwrap();
+                cmd.spawn().expect("Failed to create new window");
                 create_panes(session, &name, window, window_id);
             }
         }
     };
-    tmux(vec!["select-pane", "-t", format!("{}:0.0", name).as_str()]).spawn().unwrap();
+    tmux(vec!["select-pane", "-t", format!("{}:0.0", name).as_str()]).spawn().expect("Failed to select initial window and pane");
     let should_attach = session.attach.unwrap_or(true);
     if should_attach {
         tmux(vec!["attach", "-t", name.as_str()]).exec();
@@ -126,7 +126,7 @@ fn create_panes(session: &Session, name: &String, window: &Window, index: usize)
         pane.root.as_ref().map(|r| pane_root.push(r));
         cmd.args(vec!["-c", pane_root.to_str().expect("Failed to convert root directory name to string")]);
         pane.command.as_ref().map(|c| cmd.arg(c));
-        cmd.spawn().unwrap();
+        cmd.spawn().expect("Failed to create new pane");
     }
 }
 
