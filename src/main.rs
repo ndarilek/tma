@@ -64,6 +64,7 @@ fn start(session: Session) {
     match tmux(vec!["has-session", "-t", name.as_str()]).status() {
         Ok(s) if(s.success()) => {
             writeln!(io::stderr(), "Session already exists. Please explicitly set a unique name.").expect("Failed to write to stderr");
+            process::exit(1);
         },
         Ok(_) => { create_session(&session, name); },
         Err(e) => { writeln!(io::stderr(), "Error executing tmux: {}", e.description()).expect("Failed to write to stderr"); }
@@ -127,6 +128,11 @@ fn create_panes(session: &Session, name: &String, window: &Window, index: usize)
     }
 }
 
+fn print_usage(program: String, opts: Options) {
+    let brief = format!("Usage: {} [options]", program);
+    print!("{}", opts.usage(&brief));
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
     let program = args[0].clone();
@@ -135,12 +141,15 @@ fn main() {
     opts.optflag("h", "help", "print this help text");
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
-        Err(f) => panic!(f.to_string())
+        Err(f) => {
+            writeln!(io::stderr(), "{}", f.to_string().as_str()).expect("Failed to write to stderr");
+            print_usage(program, opts);
+            process::exit(1);
+        }
     };
     if matches.opt_present("h") {
-        let brief = format!("Usage: {} [options]", program);
-        print!("{}", opts.usage(&brief));
-        return;
+        print_usage(program, opts);
+        process::exit(0);
     }
     let path_str = matches.opt_str("c").unwrap_or(".tma.toml".to_string());
     let path = Path::new(path_str.as_str());
