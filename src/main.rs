@@ -13,7 +13,7 @@ use std::io::Write;
 use std::os::unix::process::CommandExt;
 use std::path::Path;
 use std::process;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 #[derive(Debug, Deserialize)]
 struct Session {
@@ -61,9 +61,7 @@ fn start(session: Session) {
                 .to_os_string().into_string().expect("Failed to convert current directory name to string")
         }
     };
-    let has_session = tmux(vec!["has-session", "-t", name.as_str()])
-        .status();
-    match has_session {
+    match tmux(vec!["has-session", "-t", name.as_str()]).status() {
         Ok(s) if(s.success()) => {
             writeln!(io::stderr(), "Session already exists. Please explicitly set a unique name.").expect("Failed to write to stderr");
         },
@@ -82,15 +80,15 @@ fn create_session(session: &Session, name: String) {
     session.root.as_ref().map(|r| root.push(r));
     let session_root = root.clone();
     session.window[0].pane.get(0).map(|first_pane| {
-        first_pane.command.as_ref().map(|c|  cmd.arg(c.as_str()));
         first_pane.root.as_ref().map(|r| root.push(r));
+        cmd.args(vec!["-c", root.to_str().expect("Failed to convert root directory name to string")]);
+        first_pane.command.as_ref().map(|c|  cmd.arg(c.as_str()));
     });
-    cmd.args(vec!["-c", root.to_str().expect("Failed to convert root directory name to string")]);
-    match cmd.spawn() {
+    match cmd.output() {
         Err(e) => { writeln!(io::stderr(), "Error creating session: {}", e.description()).expect("Failed to write to stderr"); },
         Ok(_) => {
             session.window[0].name.as_ref().map(|n| {
-                tmux(vec!["rename-window", "-t", name.as_str(), n.as_str()]).spawn().expect("Failed to rename window");
+                tmux(vec!["rename-window", "-t", name.as_str(), n.as_str()]).output().expect("Failed to rename window");
             });
             create_panes(session, &name, &session.window[0], 0);
             for (i, window) in session.window[1..].iter().enumerate() {
@@ -100,16 +98,16 @@ fn create_session(session: &Session, name: String) {
                 let mut window_root = session_root.clone();
                 window.root.as_ref().map(|root| window_root.push(root));
                 window.pane.get(0).as_ref().map(|first_pane| {
-                    first_pane.command.as_ref().map(|c| cmd.arg(c.as_str()));
                     first_pane.root.as_ref().map(|r| window_root.push(r));
+                    cmd.args(vec!["-c", window_root.to_str().expect("Failed to convert root directory name to string")]);
+                    first_pane.command.as_ref().map(|c| cmd.arg(c.as_str()));
                 });
-                cmd.args(vec!["-c", window_root.to_str().expect("Failed to convert root directory name to string")]);
-                cmd.spawn().expect("Failed to create new window");
+                cmd.output().expect("Failed to create new window");
                 create_panes(session, &name, window, window_id);
             }
         }
     };
-    tmux(vec!["select-pane", "-t", format!("{}:0.0", name).as_str()]).spawn().expect("Failed to select initial window and pane");
+    tmux(vec!["select-pane", "-t", format!("{}:0.0", name).as_str()]).output().expect("Failed to select initial window and pane");
     let should_attach = session.attach.unwrap_or(true);
     if should_attach {
         tmux(vec!["attach", "-t", name.as_str()]).exec();
@@ -126,7 +124,7 @@ fn create_panes(session: &Session, name: &String, window: &Window, index: usize)
         pane.root.as_ref().map(|r| pane_root.push(r));
         cmd.args(vec!["-c", pane_root.to_str().expect("Failed to convert root directory name to string")]);
         pane.command.as_ref().map(|c| cmd.arg(c));
-        cmd.spawn().expect("Failed to create new pane");
+        cmd.output().expect("Failed to create new pane");
     }
 }
 
