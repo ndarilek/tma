@@ -54,32 +54,32 @@ fn start(session: Session) {
     let name = match session.name.as_ref() {
         Some(n) => n.clone(),
         None => {
-            env::current_dir().unwrap()
-                .file_name().unwrap()
-                .to_os_string().into_string().unwrap()
+            env::current_dir().expect("Failed to get current directory")
+                .file_name().expect("Failed to get filename of current directory")
+                .to_os_string().into_string().expect("Failed to convert current directory name to string")
         }
     };
     let has_session = tmux(vec!["has-session", "-t", name.as_str()])
         .status();
     match has_session {
         Ok(s) if(s.success()) => {
-            writeln!(io::stderr(), "Session already exists. Please explicitly set a unique name.").unwrap();
+            writeln!(io::stderr(), "Session already exists. Please explicitly set a unique name.").expect("Failed to write to stderr");
         },
         Ok(_) => { create_session(session, name); },
-        Err(e) => { writeln!(io::stderr(), "Error executing tmux: {}", e.description()).unwrap(); }
+        Err(e) => { writeln!(io::stderr(), "Error executing tmux: {}", e.description()).expect("Failed to write to stderr"); }
     };
 }
 
 fn create_session(session: Session, name: String) {
     if session.window.is_empty() {
-        writeln!(io::stderr(), "Please configure at least one window.").unwrap();
+        writeln!(io::stderr(), "Please configure at least one window.").expect("Failed to write to stderr");
         process::exit(1);
     }
     let mut cmd = tmux(vec!["new", "-d", "-s", name.as_str()]);
     session.root.as_ref().map(|root| {
-        let mut r = env::current_dir().unwrap();
+        let mut r = env::current_dir().expect("Failed to get current directory");
         r.push(root);
-        cmd.args(vec!["-c", r.to_str().unwrap()]);
+        cmd.args(vec!["-c", r.to_str().expect("Failed to convert root directory name to string")]);
     });
     session.window[0].pane.get(0).map(|first_pane| {
         first_pane.command.as_ref().map(|c| {
@@ -87,7 +87,7 @@ fn create_session(session: Session, name: String) {
         });
     });
     match cmd.output() {
-        Err(e) => { writeln!(io::stderr(), "Error creating session: {}", e.description()).unwrap(); },
+        Err(e) => { writeln!(io::stderr(), "Error creating session: {}", e.description()).expect("Failed to write to stderr"); },
         Ok(_) => {
             //thread::sleep(Duration::from_millis(1000));
             session.window[0].name.as_ref().map(|n| {
@@ -101,9 +101,9 @@ fn create_session(session: Session, name: String) {
                     cmd.args(vec!["-n", n.as_str()]);
                 });
                 window.root.as_ref().map(|root| {
-                    let mut r = env::current_dir().unwrap();
+                    let mut r = env::current_dir().expect("Failed to get current directory");
                     r.push(root);
-                    cmd.args(vec!["-c", r.to_str().unwrap()]);
+                    cmd.args(vec!["-c", r.to_str().expect("Failed to convert root directory name to string")]);
                 });
                 window.pane.get(0).as_ref().map(|first_pane| {
                     first_pane.command.as_ref().map(|c| {
@@ -126,9 +126,9 @@ fn create_panes(name: &String, window: &Window, index: usize) {
     for pane in &window.pane[1..] {
         let mut cmd = tmux(vec!["split-window", "-t", format!("{}:{}", name, index).as_str()]);
         pane.root.as_ref().map(|root| {
-            let mut r = env::current_dir().unwrap();
+            let mut r = env::current_dir().expect("Failed to get current directory");
             r.push(root);
-            cmd.args(vec!["-c", r.to_str().unwrap()]);
+            cmd.args(vec!["-c", r.to_str().expect("Failed to convert root directory name to string")]);
         });
         pane.command.as_ref().map(|c| {
             cmd.arg(c);
@@ -142,7 +142,7 @@ fn main() {
     match load(path) {
         Ok(session) => start(session),
         Err(e) => {
-            writeln!(io::stderr(), "Error loading {}: {}", path.display(), e).unwrap();
+            writeln!(io::stderr(), "Error loading {}: {}", path.display(), e).expect("Failed to write to stderr");
         },
     };
 }
