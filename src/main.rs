@@ -28,7 +28,6 @@ struct Session {
 struct Window {
     name: Option<String>,
     root: Option<String>,
-    layout: Option<String>,
     pane: Vec<Pane>
 }
 
@@ -36,6 +35,7 @@ struct Window {
 struct Pane {
     root: Option<String>,
     command: Option<String>,
+    split: Option<String>,
 }
 
 fn load(path: &Path) -> Result<Session, String> {
@@ -121,6 +121,11 @@ fn create_panes(session: &Session, name: &String, window: &Window, index: usize)
         let mut pane_root = root.clone();
         pane.root.as_ref().map(|r| pane_root.push(r));
         cmd.args(vec!["-c", pane_root.to_str().expect("Failed to convert root directory name to string")]);
+        pane.split.as_ref().map(|s| {
+            if s == "horizontal" {
+                cmd.arg("-h");
+            }
+        });
         cmd.output().expect("Failed to create new pane");
         pane.command.as_ref().map(|c| {
             tmux(vec!["send-keys", format!("{}\n", c).as_str()]).output().expect("Failed to run command in pane");

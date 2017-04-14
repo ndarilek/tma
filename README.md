@@ -37,6 +37,7 @@ root = "code" # optional, path at which this window is open, relative from the s
 [[window.pane]]
 root = "subdir" # optional, path at which this pane is open, relative from the session and window root
 command = "vim" # optional, command run in this pane
+split = "horizontal" # optional, splits this window horizontally, all other values ignored
 ...
 ```
 
