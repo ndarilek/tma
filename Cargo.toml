@@ -1,6 +1,11 @@
 [package]
 name = "tma"
 version = "0.1.0"
+description = "The tmux Automator"
+repository = "https://github.com/ndarilek/tma"
+readme = "README.md"
+keywords = ["tmux"]
+license = "MIT"
 authors = ["Nolan Darilek <nolan@thewordnerd.info>"]
 
 [dependencies]
