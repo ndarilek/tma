@@ -1,0 +1,57 @@
+resources:
+
+- name: repo
+  type: git
+  source:
+    uri: https://github.com/ndarilek/tma
+    branch: master
+
+jobs:
+
+- name: build
+  public: true
+  plan:
+
+  - get: repo
+    trigger: true
+
+  - task: run build
+    config:
+      platform: linux
+      image_resource:
+        type: docker-image
+        source: {repository: jimmycuadra/rust}
+      inputs:
+        - name: repo
+      run:
+        path: sh
+        args:
+          - -exc
+          - |
+            cd repo
+            cargo build
+
+- name: release
+  public: true
+  plan:
+
+  - get: repo
+
+  - task: release
+    config:
+      params:
+        CARGO_TOKEN: {{cargo_token}}
+      platform: linux
+      image_resource:
+        type: docker-image
+        source: {repository: jimmycuadra/rust}
+      inputs:
+        - name: repo
+      run:
+        path: sh
+        args:
+          - -exc
+          - |
+            cd repo
+            cargo login ?$CARGO_TOKEN"
+            cargo publish
