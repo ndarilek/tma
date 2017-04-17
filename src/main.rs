@@ -108,25 +108,22 @@ fn create_session(session: &Session, name: String) {
 }
 
 fn create_panes(session: &Session, name: &String, window: &Window, index: usize) {
-    window.pane.get(0).as_ref().map(|pane| {
-        pane.command.as_ref().map(|c| {
-            tmux(vec!["send-keys", format!("{}\n", c).as_str()]).output().expect("Failed to run command in pane");
-        });
-    });
     let mut root = env::current_dir().expect("Failed to get current directory");
     session.root.as_ref().map(|r| root.push(r));
     window.root.as_ref().map(|r| root.push(r));
-    for pane in &window.pane[1..] {
-        let mut cmd = tmux(vec!["split-window", "-t", format!("{}:{}", name, index).as_str()]);
-        let mut pane_root = root.clone();
-        pane.root.as_ref().map(|r| pane_root.push(r));
-        cmd.args(vec!["-c", pane_root.to_str().expect("Failed to convert root directory name to string")]);
-        pane.split.as_ref().map(|s| {
-            if s == "horizontal" {
-                cmd.arg("-h");
-            }
-        });
-        cmd.output().expect("Failed to create new pane");
+    for (i, pane) in window.pane.iter().enumerate() {
+        if i != 0 {
+            let mut cmd = tmux(vec!["split-window", "-t", format!("{}:{}", name, index).as_str()]);
+            let mut pane_root = root.clone();
+            pane.root.as_ref().map(|r| pane_root.push(r));
+            cmd.args(vec!["-c", pane_root.to_str().expect("Failed to convert root directory name to string")]);
+            pane.split.as_ref().map(|s| {
+                if s == "horizontal" {
+                    cmd.arg("-h");
+                }
+            });
+            cmd.output().expect("Failed to create new pane");
+        }
         pane.command.as_ref().map(|c| {
             tmux(vec!["send-keys", format!("{}\n", c).as_str()]).output().expect("Failed to run command in pane");
         });
