@@ -1,8 +1,8 @@
+#![recursion_limit = "1024"]
+#[macro_use] extern crate error_chain;
 extern crate structopt;
 #[macro_use] extern crate structopt_derive;
-extern crate getopts;
-#[macro_use]
-extern crate serde_derive;
+#[macro_use] extern crate serde_derive;
 extern crate toml;
 
 use std::env;
@@ -16,6 +16,13 @@ use std::path::Path;
 use std::process;
 use std::process::Command;
 use structopt::StructOpt;
+
+mod errors {
+    error_chain! {
+    }
+}
+
+use errors::*;
 
 #[derive(Debug, Deserialize)]
 struct Session {
@@ -40,12 +47,14 @@ struct Pane {
     split: Option<String>,
 }
 
-fn load(path: &Path) -> Result<Session, String> {
-    let mut file = try!(File::open(path).map_err(|e| e.to_string()));
+fn load(path: &Path) -> Result<Session> {
+    let mut file = File::open(path)
+        .chain_err(|| "Unable to open configuration file")?;
     let mut content = String::new();
-    try!(file.read_to_string(&mut content).map_err(|e| e.to_string()));
-    let session: Result<Session, toml::de::Error> = toml::from_str(content.as_str());
-    session.map_err(|e| e.to_string())
+    file.read_to_string(&mut content)
+        .chain_err(|| "Unable to read configuration file")?;
+    toml::from_str(content.as_str())
+        .chain_err(|| "Unable to load configuration")
 }
 
 fn tmux(args: Vec<&str>) -> Command {
@@ -177,25 +186,19 @@ struct Cli {
     #[structopt(long = "config", short = "c", default_value = ".tma.toml")]
     config: String,
     /// Kill the configured session
-    #[structopt(long = "kill", short = "k", default_value = "false")]
+    #[structopt(long = "kill", short = "k")]
     kill: bool,
 }
 
-fn main() {
+quick_main!(|| -> Result<()> {
     let args = Cli::from_args();
     let path = Path::new(args.config.as_str());
-    match load(path) {
-        Ok(session) => {
-            if args.kill {
-                kill(&session);
-            } else {
-                start(session);
-            }
-        }
-        Err(e) => {
-            writeln!(io::stderr(), "Error loading {}: {}", path.display(), e)
-                .expect("Failed to write to stderr");
-            process::exit(1);
-        }
-    };
-}
+    let session = load(path)
+        .chain_err(|| "Unable to open configuration file")?;
+    if args.kill {
+        kill(&session);
+    } else {
+        start(session);
+    }
+    Ok(())
+});
