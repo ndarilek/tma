@@ -1,8 +1,8 @@
 [package]
 name = "tma"
-version = "0.1.0"
+version = "0.1.1"
 description = "The tmux Automator"
-repository = "https://github.com/ndarilek/tma"
+repository = "https://gitlab.com/ndarilek/tma"
 readme = "README.md"
 keywords = ["tmux"]
 license = "MIT"
