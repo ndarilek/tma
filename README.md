@@ -4,7 +4,7 @@ _tma_ is defined not so much by what I *want* in a tmux automation solution, but
 
  * I don't want a full interpreted programming language. Instead, give me a single binary I can scp to remote servers or compile for just about anything.
  * I don't want a full programming language in my automation specifications. I should be able to bang something out from memory to open a few windows and panes, and set them up like I want. [TOML](https://github.com/toml-lang/toml) should work nicely.
- * I don't want a bunch of project-specific settings in my automation, particularly when I'll likely copy the same setup to every Node/Rust/Elixir project I start. Why should my tmux automation care about a session name when it can probably infer it from the current directory? Likelise, why do I need to specify a root directory? I should be able to give someone else my setup and have it run unmodified for them.
+ * I don't want a bunch of project-specific settings in my automation, particularly when I'll likely copy the same setup to every Node/Rust/Elixir project I start. Why should my tmux automation care about a session name when it can probably infer it from the current directory? Likewise, why do I need to specify a root directory? I should be able to give someone else my setup and have it run unmodified for them.
  * I don't want my automation solution to do more than automate tmux. Don't manage a directory of configurations, spawn my editor, or do things other than rock at automating tmux.
 
 So, here's _tma_.
