@@ -1,9 +1,10 @@
+extern crate structopt;
+#[macro_use] extern crate structopt_derive;
 extern crate getopts;
 #[macro_use]
 extern crate serde_derive;
 extern crate toml;
 
-use getopts::Options;
 use std::env;
 use std::error::Error;
 use std::fs::File;
@@ -14,6 +15,7 @@ use std::os::unix::process::CommandExt;
 use std::path::Path;
 use std::process;
 use std::process::Command;
+use structopt::StructOpt;
 
 #[derive(Debug, Deserialize)]
 struct Session {
@@ -163,45 +165,28 @@ fn create_panes(session: &Session, name: &String, window: &Window, index: usize)
     }
 }
 
-fn print_usage(program: String, opts: Options) {
-    let brief = format!("Usage: {} [options]", program);
-    print!("{}", opts.usage(&brief));
-}
-
 fn kill(session: &Session) {
     let mut cmd = tmux(vec!["kill-session", "-t", session_name(session).as_str()]);
     cmd.output().expect("Error executing tmux");
 }
 
+#[derive(StructOpt, Debug)]
+#[structopt(name = "tma")]
+struct Cli {
+    /// Configuration file
+    #[structopt(long = "config", short = "c", default_value = ".tma.toml")]
+    config: String,
+    /// Kill the configured session
+    #[structopt(long = "kill", short = "k", default_value = "false")]
+    kill: bool,
+}
+
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    let program = args[0].clone();
-    let mut opts = Options::new();
-    opts.optopt("c",
-                "",
-                "specify configuration file (defaults to .tma.toml)",
-                "FILE");
-    opts.optflag("h", "help", "print this help text");
-    opts.optflag("k",
-                 "kill",
-                 "kill the session associated with this configuration");
-    let matches = match opts.parse(&args[1..]) {
-        Ok(m) => m,
-        Err(f) => {
-            writeln!(io::stderr(), "{}", f.description()).expect("Failed to write to stderr");
-            print_usage(program, opts);
-            process::exit(1);
-        }
-    };
-    if matches.opt_present("h") {
-        print_usage(program, opts);
-        process::exit(0);
-    }
-    let path_str = matches.opt_str("c").unwrap_or(".tma.toml".to_string());
-    let path = Path::new(path_str.as_str());
+    let args = Cli::from_args();
+    let path = Path::new(args.config.as_str());
     match load(path) {
         Ok(session) => {
-            if matches.opt_present("k") {
+            if args.kill {
                 kill(&session);
             } else {
                 start(session);
