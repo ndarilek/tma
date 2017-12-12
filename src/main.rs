@@ -93,7 +93,7 @@ fn start(session: Session) -> Result<()> {
     Ok(())
 }
 
-fn create_session(session: &Session, name: String) -> Result<()> {
+fn create_session(session: &Session, name: String) -> Result<&Session> {
     if session.window.is_empty() {
         return Err("Please configure at least one window.".into());
     }
@@ -138,7 +138,7 @@ fn create_session(session: &Session, name: String) -> Result<()> {
     if session.attach.unwrap_or(true) {
         tmux(vec!["attach", "-t", name.as_str()]).exec();
     }
-    Ok(())
+    Ok(session)
 }
 
 fn create_panes(session: &Session, name: &String, window: &Window, index: usize) {
