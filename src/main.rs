@@ -42,6 +42,21 @@ impl Session {
             .chain_err(|| "Unable to load configuration")
     }
 
+    fn start<'a>(&'a self) -> Result<&'a Session> {
+        let name = session_name(&self)?;
+        match tmux(vec!["has-session", "-t", name.as_str()]).status() {
+            Ok(s) if (s.success()) => {
+                Err("Session already exists. Please explicitly set a unique name.".into())
+            }
+            Ok(_) => {
+                create_session(self, name)
+            }
+            Err(e) => {
+                Err(format!("Error executing tmux: {}", e.description()).into())
+            }
+        }
+    }
+
     fn kill(&self) -> Result<&Session> {
         let mut cmd = tmux(vec!["kill-session", "-t", session_name(self)?.as_str()]);
         cmd.output()
@@ -86,20 +101,6 @@ fn session_name(session: &Session) -> Result<String> {
     Ok(name)
 }
 
-fn start<'a>(session: &'a Session) -> Result<&'a Session> {
-    let name = session_name(&session)?;
-    match tmux(vec!["has-session", "-t", name.as_str()]).status() {
-        Ok(s) if (s.success()) => {
-            Err("Session already exists. Please explicitly set a unique name.".into())
-        }
-        Ok(_) => {
-            create_session(session, name)
-        }
-        Err(e) => {
-            Err(format!("Error executing tmux: {}", e.description()).into())
-        }
-    }
-}
 
 fn create_session<'a>(session: &'a Session, name: String) -> Result<&'a Session> {
     if session.window.is_empty() {
@@ -194,7 +195,7 @@ quick_main!(|| -> Result<()> {
     if args.kill {
         Session::kill(&session)?;
     } else {
-        start(&session)?;
+        session.start()?;
     }
     Ok(())
 });
