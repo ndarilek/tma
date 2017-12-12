@@ -60,7 +60,7 @@ fn tmux(args: Vec<&str>) -> Command {
     cmd
 }
 
-fn session_name(session: &Session) -> String {
+fn session_name(session: &Session) -> Result<String> {
     let name = match session.name.as_ref() {
         Some(n) => n.clone(),
         None => {
@@ -73,11 +73,11 @@ fn session_name(session: &Session) -> String {
                 .expect("Failed to convert current directory name to string")
         }
     };
-    name
+    Ok(name)
 }
 
 fn start(session: Session) -> Result<()> {
-    let name = session_name(&session);
+    let name = session_name(&session)?;
     match tmux(vec!["has-session", "-t", name.as_str()]).status() {
         Ok(s) if (s.success()) => {
             return Err("Session already exists. Please explicitly set a unique name.".into());
@@ -168,9 +168,10 @@ fn create_panes(session: &Session, name: &String, window: &Window, index: usize)
     }
 }
 
-fn kill(session: &Session) {
-    let mut cmd = tmux(vec!["kill-session", "-t", session_name(session).as_str()]);
-    cmd.output().expect("Error executing tmux");
+fn kill(session: &Session) -> Result<std::process::Output> {
+    let mut cmd = tmux(vec!["kill-session", "-t", session_name(session)?.as_str()]);
+    cmd.output()
+        .chain_err(|| "Error killing session")
 }
 
 #[derive(StructOpt, Debug)]
@@ -190,7 +191,7 @@ quick_main!(|| -> Result<()> {
     let session = load(path)
         .chain_err(|| "Unable to open configuration file")?;
     if args.kill {
-        kill(&session);
+        kill(&session)?;
     } else {
         start(session)?;
     }
