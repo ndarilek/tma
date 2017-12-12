@@ -32,6 +32,16 @@ struct Session {
 
 impl Session {
 
+    fn load(path: &Path) -> Result<Session> {
+        let mut file = File::open(path)
+            .chain_err(|| "Unable to open configuration file")?;
+        let mut content = String::new();
+        file.read_to_string(&mut content)
+            .chain_err(|| "Unable to read configuration file")?;
+        toml::from_str(content.as_str())
+            .chain_err(|| "Unable to load configuration")
+    }
+
     fn kill(&self) -> Result<&Session> {
         let mut cmd = tmux(vec!["kill-session", "-t", session_name(self)?.as_str()]);
         cmd.output()
@@ -52,16 +62,6 @@ struct Pane {
     root: Option<String>,
     command: Option<String>,
     split: Option<String>,
-}
-
-fn load(path: &Path) -> Result<Session> {
-    let mut file = File::open(path)
-        .chain_err(|| "Unable to open configuration file")?;
-    let mut content = String::new();
-    file.read_to_string(&mut content)
-        .chain_err(|| "Unable to read configuration file")?;
-    toml::from_str(content.as_str())
-        .chain_err(|| "Unable to load configuration")
 }
 
 fn tmux(args: Vec<&str>) -> Command {
@@ -190,7 +190,7 @@ struct Cli {
 quick_main!(|| -> Result<()> {
     let args = Cli::from_args();
     let path = Path::new(args.config.as_str());
-    let session = load(path)?;
+    let session = Session::load(path)?;
     if args.kill {
         Session::kill(&session)?;
     } else {
