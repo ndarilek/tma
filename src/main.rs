@@ -65,9 +65,9 @@ fn session_name(session: &Session) -> Result<String> {
         Some(n) => n.clone(),
         None => {
             env::current_dir()
-                .expect("Failed to get current directory")
+                .chain_err(|| "Failed to get current directory")?
                 .file_name()
-                .expect("Failed to get filename of current directory")
+                .chain_err(|| "Failed to get filename of current directory")?
                 .to_os_string()
                 .into_string()
                 .expect("Failed to convert current directory name to string")
