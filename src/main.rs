@@ -168,10 +168,11 @@ fn create_panes(session: &Session, name: &String, window: &Window, index: usize)
     }
 }
 
-fn kill(session: &Session) -> Result<std::process::Output> {
+fn kill(session: &Session) -> Result<&Session> {
     let mut cmd = tmux(vec!["kill-session", "-t", session_name(session)?.as_str()]);
     cmd.output()
-        .chain_err(|| "Error killing session")
+        .chain_err(|| "Error killing session")?;
+    Ok(session)
 }
 
 #[derive(StructOpt, Debug)]
