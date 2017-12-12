@@ -30,6 +30,16 @@ struct Session {
     window: Vec<Window>,
 }
 
+impl Session {
+
+    fn kill(&self) -> Result<&Session> {
+        let mut cmd = tmux(vec!["kill-session", "-t", session_name(self)?.as_str()]);
+        cmd.output()
+            .chain_err(|| "Error killing session")?;
+        Ok(self)
+    }
+
+}
 #[derive(Debug, Deserialize)]
 struct Window {
     name: Option<String>,
@@ -166,13 +176,6 @@ fn create_panes(session: &Session, name: &String, window: &Window, index: usize)
     }
 }
 
-fn kill(session: &Session) -> Result<&Session> {
-    let mut cmd = tmux(vec!["kill-session", "-t", session_name(session)?.as_str()]);
-    cmd.output()
-        .chain_err(|| "Error killing session")?;
-    Ok(session)
-}
-
 #[derive(StructOpt, Debug)]
 #[structopt(name = "tma")]
 struct Cli {
@@ -189,7 +192,7 @@ quick_main!(|| -> Result<()> {
     let path = Path::new(args.config.as_str());
     let session = load(path)?;
     if args.kill {
-        kill(&session)?;
+        Session::kill(&session)?;
     } else {
         start(&session)?;
     }
