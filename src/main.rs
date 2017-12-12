@@ -8,12 +8,9 @@ extern crate toml;
 use std::env;
 use std::error::Error;
 use std::fs::File;
-use std::io;
 use std::io::Read;
-use std::io::Write;
 use std::os::unix::process::CommandExt;
 use std::path::Path;
-use std::process;
 use std::process::Command;
 use structopt::StructOpt;
 
@@ -79,30 +76,26 @@ fn session_name(session: &Session) -> String {
     name
 }
 
-fn start(session: Session) {
+fn start(session: Session) -> Result<()> {
     let name = session_name(&session);
     match tmux(vec!["has-session", "-t", name.as_str()]).status() {
         Ok(s) if (s.success()) => {
-            writeln!(io::stderr(),
-                     "Session already exists. Please explicitly set a unique name.")
-                .expect("Failed to write to stderr");
-            process::exit(1);
+            return Err("Session already exists. Please explicitly set a unique name.".into());
         }
         Ok(_) => {
-            create_session(&session, name);
+            create_session(&session, name)
+                .chain_err(|| "Unable to create session")?;
         }
         Err(e) => {
-            writeln!(io::stderr(), "Error executing tmux: {}", e.description())
-                .expect("Failed to write to stderr");
+            return Err(format!("Error executing tmux: {}", e.description()).into());
         }
     };
+    Ok(())
 }
 
-fn create_session(session: &Session, name: String) {
+fn create_session(session: &Session, name: String) -> Result<()> {
     if session.window.is_empty() {
-        writeln!(io::stderr(), "Please configure at least one window.")
-            .expect("Failed to write to stderr");
-        process::exit(1);
+        return Err("Please configure at least one window.".into());
     }
     let mut session_root = env::current_dir().expect("Failed to get current directory");
     session.root.as_ref().map(|r| session_root.push(r));
@@ -111,8 +104,7 @@ fn create_session(session: &Session, name: String) {
     session.window[0].pane.get(0).as_ref().map(|p| p.root.as_ref().map(|r| root.push(r)));
     match tmux(vec!["new", "-d", "-s", name.as_str(), "-c", root.to_str().unwrap()]).output() {
         Err(e) => {
-            writeln!(io::stderr(), "Error creating session: {}", e.description())
-                .expect("Failed to write to stderr");
+            return Err(format!("Error creating session: {}", e.description()).into());
         }
         Ok(_) => {
             for (i, window) in session.window.iter().enumerate() {
@@ -130,10 +122,11 @@ fn create_session(session: &Session, name: String) {
                                             window_root.to_str().unwrap()]);
                     cmd.output().expect("Failed to create new window");
                 }
-                window.name.as_ref().map(|n| {
+                window.name.as_ref().map(|n| -> Result<()> {
                     tmux(vec!["rename-window", "-t", name.as_str(), n.as_str()])
                         .output()
-                        .expect("Failed to rename window");
+                        .chain_err(|| "Failed to rename window")?;
+                        Ok(())
                 });
                 create_panes(session, &name, window, i);
             }
@@ -141,10 +134,11 @@ fn create_session(session: &Session, name: String) {
     };
     tmux(vec!["select-pane", "-t", format!("{}:0.0", name).as_str()])
         .output()
-        .expect("Failed to select initial window and pane");
+        .chain_err(|| "Error running tmux")?;
     if session.attach.unwrap_or(true) {
         tmux(vec!["attach", "-t", name.as_str()]).exec();
     }
+    Ok(())
 }
 
 fn create_panes(session: &Session, name: &String, window: &Window, index: usize) {
@@ -198,7 +192,7 @@ quick_main!(|| -> Result<()> {
     if args.kill {
         kill(&session);
     } else {
-        start(session);
+        start(session)?;
     }
     Ok(())
 });
