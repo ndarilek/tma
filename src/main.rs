@@ -32,6 +32,22 @@ struct Session {
 
 impl Session {
 
+    fn session_name(&self) -> Result<String> {
+        let name = match self.name.as_ref() {
+            Some(n) => n.clone(),
+            None => {
+                env::current_dir()
+                    .chain_err(|| "Failed to get current directory")?
+                    .file_name()
+                    .chain_err(|| "Failed to get filename of current directory")?
+                    .to_os_string()
+                    .into_string()
+                    .expect("Failed to convert current directory name to string")
+            }
+        };
+        Ok(name)
+    }
+
     fn load(path: &Path) -> Result<Session> {
         let mut file = File::open(path)
             .chain_err(|| "Unable to open configuration file")?;
@@ -43,7 +59,7 @@ impl Session {
     }
 
     fn start<'a>(&'a self) -> Result<&'a Session> {
-        let name = session_name(&self)?;
+        let name = self.session_name()?;
         match tmux(vec!["has-session", "-t", name.as_str()]).status() {
             Ok(s) if (s.success()) => {
                 Err("Session already exists. Please explicitly set a unique name.".into())
@@ -58,7 +74,7 @@ impl Session {
     }
 
     fn kill(&self) -> Result<&Session> {
-        let mut cmd = tmux(vec!["kill-session", "-t", session_name(self)?.as_str()]);
+        let mut cmd = tmux(vec!["kill-session", "-t", self.session_name()?.as_str()]);
         cmd.output()
             .chain_err(|| "Error killing session")?;
         Ok(self)
@@ -84,23 +100,6 @@ fn tmux(args: Vec<&str>) -> Command {
     cmd.args(args);
     cmd
 }
-
-fn session_name(session: &Session) -> Result<String> {
-    let name = match session.name.as_ref() {
-        Some(n) => n.clone(),
-        None => {
-            env::current_dir()
-                .chain_err(|| "Failed to get current directory")?
-                .file_name()
-                .chain_err(|| "Failed to get filename of current directory")?
-                .to_os_string()
-                .into_string()
-                .expect("Failed to convert current directory name to string")
-        }
-    };
-    Ok(name)
-}
-
 
 fn create_session<'a>(session: &'a Session, name: String) -> Result<&'a Session> {
     if session.window.is_empty() {
