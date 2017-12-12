@@ -188,8 +188,7 @@ struct Cli {
 quick_main!(|| -> Result<()> {
     let args = Cli::from_args();
     let path = Path::new(args.config.as_str());
-    let session = load(path)
-        .chain_err(|| "Unable to open configuration file")?;
+    let session = load(path)?;
     if args.kill {
         kill(&session)?;
     } else {
