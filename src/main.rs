@@ -76,24 +76,22 @@ fn session_name(session: &Session) -> Result<String> {
     Ok(name)
 }
 
-fn start(session: Session) -> Result<()> {
+fn start<'a>(session: &'a Session) -> Result<&'a Session> {
     let name = session_name(&session)?;
     match tmux(vec!["has-session", "-t", name.as_str()]).status() {
         Ok(s) if (s.success()) => {
-            return Err("Session already exists. Please explicitly set a unique name.".into());
+            Err("Session already exists. Please explicitly set a unique name.".into())
         }
         Ok(_) => {
-            create_session(&session, name)
-                .chain_err(|| "Unable to create session")?;
+            create_session(session, name)
         }
         Err(e) => {
-            return Err(format!("Error executing tmux: {}", e.description()).into());
+            Err(format!("Error executing tmux: {}", e.description()).into())
         }
-    };
-    Ok(())
+    }
 }
 
-fn create_session(session: &Session, name: String) -> Result<&Session> {
+fn create_session<'a>(session: &'a Session, name: String) -> Result<&'a Session> {
     if session.window.is_empty() {
         return Err("Please configure at least one window.".into());
     }
@@ -193,7 +191,7 @@ quick_main!(|| -> Result<()> {
     if args.kill {
         kill(&session)?;
     } else {
-        start(session)?;
+        start(&session)?;
     }
     Ok(())
 });
