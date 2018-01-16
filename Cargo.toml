@@ -10,6 +10,8 @@ authors = ["Nolan Darilek <nolan@thewordnerd.info>"]
 
 [dependencies]
 failure = "0.1"
+log = "0.4"
+stderrlog = "0.2"
 structopt = "0.1.0"
 structopt-derive = "0.1.0"
 serde = "1.0"
