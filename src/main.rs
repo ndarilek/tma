@@ -60,6 +60,9 @@ impl Session {
     }
 
     fn start(&self) -> Result<&Session, Error> {
+        if self.window.is_empty() {
+            return Err(err_msg("Please configure at least one window."));
+        }
         match tmux(vec!["has-session", "-t", self.session_name()?.as_str()]).status() {
             Ok(s) if (s.success()) => {
                 Err(err_msg(
@@ -73,9 +76,6 @@ impl Session {
 
     fn create(&self) -> Result<&Session, Error> {
         let name = self.session_name()?;
-        if self.window.is_empty() {
-            return Err(err_msg("Please configure at least one window."));
-        }
         let mut session_root = env::current_dir().context(
             "Failed to get current directory",
         )?;
