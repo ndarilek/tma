@@ -1,6 +1,4 @@
-#![recursion_limit = "1024"]
-#[macro_use]
-extern crate error_chain;
+extern crate failure;
 extern crate structopt;
 #[macro_use]
 extern crate structopt_derive;
@@ -9,19 +7,14 @@ extern crate serde_derive;
 extern crate toml;
 
 use std::env;
-use std::error::Error;
 use std::fs::File;
 use std::io::Read;
 use std::os::unix::process::CommandExt;
 use std::path::Path;
 use std::process::Command;
+
+use failure::{Error, Fail, ResultExt, err_msg};
 use structopt::StructOpt;
-
-mod errors {
-    error_chain!{}
-}
-
-use errors::*;
 
 fn tmux(args: Vec<&str>) -> Command {
     let mut cmd = Command::new("tmux");
@@ -39,14 +32,14 @@ struct Session {
 }
 
 impl Session {
-    fn session_name(&self) -> Result<String> {
+    fn session_name(&self) -> Result<String, Error> {
         let name = match self.name.as_ref() {
             Some(n) => n.clone(),
             None => {
                 env::current_dir()
-                    .chain_err(|| "Failed to get current directory")?
+                    .context("Failed to get current directory")?
                     .file_name()
-                    .chain_err(|| "Failed to get filename of current directory")?
+                    .expect("Failed to get filename of current directory")
                     .to_os_string()
                     .into_string()
                     .expect("Failed to convert current directory name to string")
@@ -55,36 +48,36 @@ impl Session {
         Ok(name)
     }
 
-    fn load(path: &Path) -> Result<Session> {
-        let mut file = File::open(path).chain_err(
-            || "Unable to open configuration file",
+    fn load(path: &Path) -> Result<Session, Error> {
+        let mut file = File::open(path).context(
+            "Unable to open configuration file",
         )?;
         let mut content = String::new();
-        file.read_to_string(&mut content).chain_err(
-            || "Unable to read configuration file",
+        file.read_to_string(&mut content).context(
+            "Unable to read configuration file",
         )?;
-        toml::from_str(content.as_str()).chain_err(|| "Unable to load configuration")
+        toml::from_str(content.as_str()).map_err(|e| err_msg(e))
     }
 
-    fn start(&self) -> Result<&Session> {
+    fn start(&self) -> Result<&Session, Error> {
         match tmux(vec!["has-session", "-t", self.session_name()?.as_str()]).status() {
             Ok(s) if (s.success()) => {
-                Err(
-                    "Session already exists. Please explicitly set a unique name.".into(),
-                )
+                Err(err_msg(
+                    "Session already exists. Please explicitly set a unique name.",
+                ))
             }
             Ok(_) => self.create(),
-            Err(e) => Err(format!("Error executing tmux: {}", e.description()).into()),
+            Err(e) => Err(e.context("Error executing tmux"))?,
         }
     }
 
-    fn create(&self) -> Result<&Session> {
+    fn create(&self) -> Result<&Session, Error> {
         let name = self.session_name()?;
         if self.window.is_empty() {
-            return Err("Please configure at least one window.".into());
+            return Err(err_msg("Please configure at least one window."));
         }
-        let mut session_root = env::current_dir().chain_err(
-            || "Failed to get current directory",
+        let mut session_root = env::current_dir().context(
+            "Failed to get current directory",
         )?;
         self.root.as_ref().map(|r| session_root.push(r));
         let mut root = session_root.clone();
@@ -100,7 +93,7 @@ impl Session {
             "-c",
             root.to_str().unwrap(),
         ]).output()
-            .chain_err(|| "Error creating session")?;
+            .context("Error creating session")?;
         for (i, window) in self.window.iter().enumerate() {
             if i != 0 {
                 let mut window_root = session_root.clone();
@@ -115,29 +108,29 @@ impl Session {
                     "-c",
                     window_root.to_str().unwrap(),
                 ]);
-                cmd.output().chain_err(|| "Failed to create new window")?;
+                cmd.output().context("Failed to create new window")?;
             }
-            window.name.as_ref().map(|n| -> Result<()> {
+            window.name.as_ref().map(|n| -> Result<(), Error> {
                 tmux(vec!["rename-window", "-t", name.as_str(), n.as_str()])
                     .output()
-                    .chain_err(|| "Failed to rename window")?;
+                    .context("Failed to rename window")?;
                 Ok(())
             });
             self.create_panes(window, i)?;
         }
         tmux(vec!["select-pane", "-t", format!("{}:0.0", name).as_str()])
             .output()
-            .chain_err(|| "Error selecting pane")?;
+            .context("Error selecting pane")?;
         if self.attach.unwrap_or(true) {
             tmux(vec!["attach", "-t", name.as_str()]).exec();
         }
         Ok(self)
     }
 
-    fn create_panes(&self, window: &Window, index: usize) -> Result<&Session> {
+    fn create_panes(&self, window: &Window, index: usize) -> Result<&Session, Error> {
         let name = self.session_name()?;
-        let mut root = env::current_dir().chain_err(
-            || "Failed to get current directory",
+        let mut root = env::current_dir().context(
+            "Failed to get current directory",
         )?;
         self.root.as_ref().map(|r| root.push(r));
         window.root.as_ref().map(|r| root.push(r));
@@ -152,28 +145,28 @@ impl Session {
                 pane.root.as_ref().map(|r| pane_root.push(r));
                 cmd.args(vec![
                     "-c",
-                    pane_root.to_str().chain_err(
-                        || "Failed to convert root directory name to string"
-                    )?,
+                    pane_root.to_str().expect(
+                        "Failed to convert root directory name to string"
+                    ),
                 ]);
                 pane.split.as_ref().map(|s| if s == "horizontal" {
                     cmd.arg("-h");
                 });
-                cmd.output().chain_err(|| "Failed to create new pane")?;
+                cmd.output().context("Failed to create new pane")?;
             }
-            pane.command.as_ref().map(|c| -> Result<()> {
+            pane.command.as_ref().map(|c| -> Result<(), Error> {
                 tmux(vec!["send-keys", format!("{}\n", c).as_str()])
                     .output()
-                    .chain_err(|| "Failed to run command in pane")?;
+                    .context("Failed to run command in pane")?;
                 Ok(())
             });
         }
         Ok(self)
     }
 
-    fn kill(&self) -> Result<&Session> {
+    fn kill(&self) -> Result<&Session, Error> {
         let mut cmd = tmux(vec!["kill-session", "-t", self.session_name()?.as_str()]);
-        cmd.output().chain_err(|| "Error killing session")?;
+        cmd.output().context("Error killing session")?;
         Ok(self)
     }
 }
@@ -203,14 +196,13 @@ struct Cli {
     kill: bool,
 }
 
-quick_main!(|| -> Result<()> {
+fn main() {
     let args = Cli::from_args();
     let path = Path::new(args.config.as_str());
-    let session = Session::load(path)?;
+    let session = Session::load(path).expect("Failed to load configuration");
     if args.kill {
-        session.kill()?;
+        session.kill().expect("Failed to kill session");
     } else {
-        session.start()?;
+        session.start().expect("Failed to start session");
     }
-    Ok(())
-});
+}
